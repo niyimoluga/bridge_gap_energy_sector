@@ -1,0 +1,25 @@
+/* Style for KPI boxes */
+.kpi-box {
+    background-color: #f9f9f9;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 15px 25px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.05);
+    margin: 10px;
+    flex: 1 1 300px; /* makes the boxes flexible */
+}
+
+/* For Advanced Insights tab specifically */
+#advanced-kpi-senior-roles,
+#advanced-kpi-female-inventors,
+#advanced-kpi-wage-gap,
+#advanced-kpi-diverse-founders {
+    min-width: 250px;
+    background-color: #fffbea;
+    border-color: #ffd700;
+}
+
