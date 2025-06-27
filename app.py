@@ -3,6 +3,8 @@ from dash import html, dcc
 from dash import Input, Output
 import pandas as pd
 from utils import load_combined_data
+import plotly.express as px
+
 
 # Load data
 df = load_combined_data()
@@ -189,20 +191,19 @@ app.layout = html.Div([
     ])
 ]),
 
-        dcc.Tab(label='Advanced Insights', children=[
+       dcc.Tab(label='Advanced Insights', children=[
     html.Div([
         html.H3("Advanced Insights", style={'textAlign': 'center'}),
 
-        html.Div(id='advanced-kpi-senior-roles', className='kpi-box', style={'margin': '10px'}),
-        html.Div(id='advanced-kpi-female-inventors', className='kpi-box', style={'margin': '10px'}),
-        html.Div(id='advanced-kpi-wage-gap', className='kpi-box', style={'margin': '10px'}),
-        html.Div(id='advanced-kpi-diverse-founders', className='kpi-box', style={'margin': '10px'})
-    ], style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'space-around', 'marginTop': '20px'})
-]),
+        dcc.Graph(id='advanced-senior-chart'),
+        dcc.Graph(id='advanced-inventors-chart'),
+        dcc.Graph(id='advanced-wage-gap-chart'),
+        dcc.Graph(id='advanced-founders-chart')
+    ])
+])
+    ])  # 👈 Add this to close dcc.Tabs
+    ])  # 👈 This closes html.Div([
 
-
-    ])  # CLOSE dcc.Tabs here
-])  # CLOSE html.Div here
 
 
 # End of layout above...
@@ -588,78 +589,74 @@ def update_explorer_trend(country, topic, indicator):
     return fig
 
 @app.callback(
-    Output('advanced-kpi-senior-roles', 'children'),
-    Output('advanced-kpi-female-inventors', 'children'),
-    Output('advanced-kpi-wage-gap', 'children'),
-    Output('advanced-kpi-diverse-founders', 'children'),
-    Input('explorer-country', 'value')  # Trigger update
+    Output('advanced-senior-chart', 'figure'),
+    Output('advanced-inventors-chart', 'figure'),
+    Output('advanced-wage-gap-chart', 'figure'),
+    Output('advanced-founders-chart', 'figure'),
+    Input('explorer-country', 'value')  # Just a dummy input to trigger update
 )
 def update_advanced_insights(_):
-    # Define valid countries — based on IEA dataset
+
     VALID_COUNTRIES = ['Austria', 'France', 'Germany', 'Portugal', 'Spain']
 
-    # === Women in Senior Roles ===
+    # === 1. Senior Roles ===
     senior = df[(df['Topic'] == 'Senior Management') &
-                (df['Indicator'].str.contains("Share of female senior managers", case=False, na=False))]
-    senior = senior[senior['Country'].isin(VALID_COUNTRIES)]
-    senior_grouped = senior.groupby('Country').agg(
-        mean_value=('Value', 'mean'),
-        count=('Value', 'count')
-    ).reset_index()
-    senior_filtered = senior_grouped[senior_grouped['count'] >= 5]
-    if not senior_filtered.empty:
-        best_senior = senior_filtered.sort_values(by='mean_value', ascending=False).iloc[0]
-        senior_text = f"🏆 Country with Highest % Women in Senior Roles: {best_senior['Country']} ({best_senior['mean_value']:.2f}%)"
-    else:
-        senior_text = "🏆 No country with sufficient data for Senior Roles"
+                (df['Indicator'].str.contains("Share of female senior managers", case=False, na=False)) &
+                (df['Country'].isin(VALID_COUNTRIES))]
+    senior_grouped = senior.groupby('Country').agg(mean_value=('Value', 'mean')).reset_index()
+    senior_fig = px.bar(
+        senior_grouped.sort_values(by='mean_value', ascending=True),
+        x='mean_value', y='Country', orientation='h',
+        title='% Women in Senior Roles by Country',
+        labels={'mean_value': '% Women'},
+        color='mean_value',
+        color_continuous_scale='Blues'
+    )
 
-    # === Female Inventors ===
+    # === 2. Female Inventors ===
     inventors = df[(df['Topic'] == 'Innovation') &
-                   (df['Indicator'].str.contains("female inventors", case=False, na=False))]
-    inventors = inventors[inventors['Country'].isin(VALID_COUNTRIES)]
-    inventors_grouped = inventors.groupby('Country').agg(
-        mean_value=('Value', 'mean'),
-        count=('Value', 'count')
-    ).reset_index()
-    inventors_filtered = inventors_grouped[inventors_grouped['count'] >= 5]
-    if not inventors_filtered.empty:
-        best_inventors = inventors_filtered.sort_values(by='mean_value', ascending=False).iloc[0]
-        inventors_text = f"💡 Country with Highest % Female Inventors: {best_inventors['Country']} ({best_inventors['mean_value']:.2f}%)"
-    else:
-        inventors_text = "💡 No country with sufficient data for Female Inventors"
+                   (df['Indicator'].str.contains("female inventors", case=False, na=False)) &
+                   (df['Country'].isin(VALID_COUNTRIES))]
+    inventors_grouped = inventors.groupby('Country').agg(mean_value=('Value', 'mean')).reset_index()
+    inventors_fig = px.bar(
+        inventors_grouped.sort_values(by='mean_value', ascending=True),
+        x='mean_value', y='Country', orientation='h',
+        title='% Female Inventors by Country',
+        labels={'mean_value': '% Female Inventors'},
+        color='mean_value',
+        color_continuous_scale='Purples'
+    )
 
-    # === Largest Gender Wage Gap (most negative) ===
+    # === 3. Wage Gap (red = worse for women) ===
     wage = df[(df['Topic'] == 'Employment') &
-              (df['Indicator'].str.contains("wage gap", case=False, na=False))]
-    wage = wage[wage['Country'].isin(VALID_COUNTRIES)]
-    wage_grouped = wage.groupby('Country').agg(
-        mean_value=('Value', 'mean'),
-        count=('Value', 'count')
-    ).reset_index()
-    wage_filtered = wage_grouped[wage_grouped['count'] >= 5]
-    if not wage_filtered.empty:
-        worst_wage_gap = wage_filtered.sort_values(by='mean_value', ascending=True).iloc[0]
-        wage_text = f"⚠️ Country with Largest Gender Wage Gap: {worst_wage_gap['Country']} ({worst_wage_gap['mean_value']:.2f}%)"
-    else:
-        wage_text = "⚠️ No country with sufficient data for Wage Gap"
+              (df['Indicator'].str.contains("wage gap", case=False, na=False)) &
+              (df['Country'].isin(VALID_COUNTRIES))]
+    wage_grouped = wage.groupby('Country').agg(mean_value=('Value', 'mean')).reset_index()
+    wage_grouped['Color'] = wage_grouped['mean_value'].apply(lambda x: 'red' if x < 0 else 'green')
+    wage_fig = px.bar(
+        wage_grouped.sort_values(by='mean_value'),
+        x='mean_value', y='Country', orientation='h',
+        title='Average Gender Wage Gap by Country',
+        labels={'mean_value': 'Wage Gap (%)'},
+        color='Color',
+        color_discrete_map={'red': 'crimson', 'green': 'seagreen'}
+    )
 
-    # === Gender-Diverse Founders ===
+    # === 4. Gender-Diverse Founders ===
     founders = df[(df['Topic'] == 'Entrepreneurship') &
-                  (df['Indicator'].str.contains("gender diverse", case=False, na=False))]
-    founders = founders[founders['Country'].isin(VALID_COUNTRIES)]
-    founders_grouped = founders.groupby('Country').agg(
-        mean_value=('Value', 'mean'),
-        count=('Value', 'count')
-    ).reset_index()
-    founders_filtered = founders_grouped[founders_grouped['count'] >= 5]
-    if not founders_filtered.empty:
-        best_founders = founders_filtered.sort_values(by='mean_value', ascending=False).iloc[0]
-        founders_text = f"🚀 Country with Highest % Gender-Diverse Founders: {best_founders['Country']} ({best_founders['mean_value']:.2f}%)"
-    else:
-        founders_text = "🚀 No country with sufficient data for Gender-Diverse Founders"
+                  (df['Indicator'].str.contains("gender diverse", case=False, na=False)) &
+                  (df['Country'].isin(VALID_COUNTRIES))]
+    founders_grouped = founders.groupby('Country').agg(mean_value=('Value', 'mean')).reset_index()
+    founders_fig = px.bar(
+        founders_grouped.sort_values(by='mean_value', ascending=True),
+        x='mean_value', y='Country', orientation='h',
+        title='% Gender-Diverse Founders by Country',
+        labels={'mean_value': '% Diverse Founders'},
+        color='mean_value',
+        color_continuous_scale='Oranges'
+    )
 
-    # Return all KPI texts
-    return senior_text, inventors_text, wage_text, founders_text
+    return senior_fig, inventors_fig, wage_fig, founders_fig
 
 
 
