@@ -1,3 +1,22 @@
+"""
+Gender Gap Visual Analytics Dashboard
+-------------------------------------
+
+This Dash app analyzes gender disparities in the energy sector using data from OECD/IEA.
+It includes 6 interactive tabs covering:
+    - Employment
+    - Senior Management
+    - Innovation & Patents
+    - Entrepreneurship
+    - KPI Overview
+    - Country Comparison (Advanced Insights)
+
+Each chart is interactive and updates based on selected country and/or year range.
+
+Author(s): [Your Names Here]
+Course: Computational Visual Analytics
+Date: July 2025
+"""
 import dash
 from dash import html, dcc
 from dash import Input, Output
@@ -31,9 +50,11 @@ app.layout = html.Div([
                     dcc.Dropdown(
                         id='country-dropdown',
                         options=[{'label': c, 'value': c} for c in countries],
-                        value='France',
+                        value=['France'],  # default selected country as a list
+                        multi=True,
                         clearable=False
-                    )
+            )
+
                 ], style={'width': '30%', 'display': 'inline-block'}),
 
                 html.Div([
@@ -216,8 +237,8 @@ app.layout = html.Div([
     Input("country-dropdown", "value"),
     Input("year-slider", "value")
 )
-def update_kpis(country, year_range):
-    dff = df[(df["Country"] == country) & 
+def update_kpis(selected_countries, year_range):
+    dff = df[(df["Country"].isin(selected_countries)) & 
              (df["Year"] >= year_range[0]) & 
              (df["Year"] <= year_range[1])]
 
@@ -233,7 +254,7 @@ def update_kpis(country, year_range):
     inventors_pct = inventors["Value"].mean()
 
     founders = dff[(dff["Topic"] == "Entrepreneurship") & 
-                   (dff["Indicator"].str.contains("gender diverse", case=False, na=False))]
+                   (df["Indicator"].str.contains("gender diverse", case=False, na=False))]
     founders_pct = founders["Value"].mean()
 
     return (
@@ -336,7 +357,11 @@ def update_senior_management_charts(country):
              (df['Indicator'].str.contains("Share of female senior managers", case=False, na=False))]
 
     # === Bar Chart ===
-    grouped = dff.groupby("Indicator Categories")["Value"].mean().reset_index()
+    # Filter out decade-like categories (those that end with 's' and are 4 characters long, like '1950s')
+    dff_filtered = dff[~dff["Indicator Categories"].str.match(r"^\d{4}s$", na=False)]
+
+    grouped = dff_filtered.groupby("Indicator Categories")["Value"].mean().reset_index()
+
     bar_fig = {
         "data": [{
             "x": grouped["Indicator Categories"],
@@ -472,22 +497,17 @@ def update_entrepreneurship_charts(country):
              (df['Topic'] == 'Entrepreneurship') & 
              (df['Indicator'].str.contains("gender diverse", case=False, na=False))]
 
-    # === Bar Chart: % Gender-Diverse Founders by Sector ===
+    # === Treemap: % Gender-Diverse Founders by Sector ===
     sector_grouped = dff.groupby("Technology or Sector")["Value"].mean().reset_index()
 
-    sector_bar_fig = {
-        "data": [{
-            "x": sector_grouped["Technology or Sector"],
-            "y": sector_grouped["Value"],
-            "type": "bar",
-            "name": "Gender-Diverse Founders (%)"
-        }],
-        "layout": {
-            "title": f"% Gender-Diverse Founders by Sector – {country}",
-            "yaxis": {"title": "% Gender-Diverse Founders"},
-            "xaxis": {"title": "Sector", "tickangle": -45}
-        }
-    }
+    sector_tree_fig = px.treemap(
+        sector_grouped,
+        path=['Technology or Sector'],
+        values='Value',
+        title=f'% Gender-Diverse Founders by Sector – {country}',
+        color='Value',
+        color_continuous_scale='Oranges'
+    )
 
     # === Line Chart: % Gender-Diverse Founders Over Time ===
     if dff.empty:
@@ -497,7 +517,6 @@ def update_entrepreneurship_charts(country):
                 "xaxis": {"visible": False},
                 "yaxis": {"visible": False},
                 "annotations": [{
-
                     "text": "No data available",
                     "xref": "paper",
                     "yref": "paper",
@@ -524,7 +543,7 @@ def update_entrepreneurship_charts(country):
             }
         }
 
-    return sector_bar_fig, trend_fig
+    return sector_tree_fig, trend_fig
 
 @app.callback(
     Output('explorer-indicator', 'options'),
@@ -664,5 +683,3 @@ def update_advanced_insights(_):
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-
